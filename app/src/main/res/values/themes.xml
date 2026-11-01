@@ -1,0 +1,1 @@
+<resources><style name="Theme.TicketApp" parent="android:style/Theme.Material.Light.NoActionBar"><item name="android:fontFamily">sans</item><item name="android:windowLightStatusBar">false</item><item name="android:statusBarColor">#172F35</item><item name="android:navigationBarColor">#172F35</item><item name="android:windowActionModeOverlay">true</item></style></resources>
