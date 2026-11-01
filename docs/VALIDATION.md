@@ -1,27 +1,45 @@
-# Validation evidence
+# Version 1.1 validation
 
-Validated in the managed cloud environment on November 1, 2026, using Temurin JDK 21, Android SDK 35, Gradle 8.13, and an AOSP Android 11 / API 30 x86_64 emulator. Software emulation was used because `/dev/kvm` is unavailable. The device test run executed in airplane mode. The APK manifest was inspected with `aapt dump permissions`: no Internet permission is requested.
+Validated November 1, 2026, in the managed cloud environment with JDK 21, Android SDK 35, Gradle 8.13, and an Android 11 / API 30 emulator. The emulator uses software acceleration and an 800×1200 physical display, with actual app windows resized between 400×880 dp (cover-like) and 768×896 dp (unfolded-like). The application has no Internet permission.
 
-| Check | Actual outcome |
+| Check | Final result |
 | --- | --- |
-| `:app:assembleDebug` | Passed; installable, debug-signed APK produced |
-| `:app:testDebugUnitTest` | 13 passed; 0 failed, 0 skipped |
-| `:app:connectedDebugAndroidTest` | 14 passed; 0 failed, 0 skipped |
-| `:app:lintDebug` | 0 errors; 0 warnings |
-| `scripts/cloud-setup.sh` | Executed successfully end to end on the current instance |
-| Native dashboard | Rendered and visually inspected on the emulator |
-| Reusable environment configuration | `install_script` and `start_skill` saved to the environment draft |
+| Debug APK build | Passed; version 1.1.0, version code 2 |
+| Unit tests | 17 passed; 0 failures/errors/skips |
+| Android instrumented tests | 17 passed; 0 failures/errors/skips |
+| Android lint | 0 errors; 0 warnings |
+| APK update signing | Same certificate as the original version 1.0 debug APK |
 
-The instrumented suite verifies actual SQLite persistence and field/audit rollback after a deliberately rejected audit insert; repeated hold/archive/reopen cycles; stale edits and idempotent creation; field rename/retirement/conversion; note, attachment, and reminder history; reminder rescheduling; schema migration; rejected corrupt backups; backup restoration with removed media; and restore-journal recovery on both sides of the commit boundary. Android reminder tests verify real notification delivery, deduplication, no delivery for archived/future reminders, unique scheduling, cancellation, and restoration after reopening. The Compose test verifies that an unsaved form survives activity recreation, creates and saves a request, orders/archives it, requires a reopening reason, reopens it, and checks that editing is available again.
+## Foldable behavior verified
 
-## Device QA before production distribution
+Three real Android UI tests verify:
 
-The following are implemented but not exhaustively validated by this environment's API 30 emulator: physical-camera photo/video capture, representative manufacturer video formats and document handlers, Android 13+ notification permission grant/denial, OEM Doze/battery restrictions, actual power-off/reboot and wall-clock/timezone changes, screen-reader interaction, large real-world datasets/backups, and a multi-version physical-device matrix. WorkManager notifications are inexact and can be delayed by Android. The app explains this limitation; no exact-alarm permission is requested.
+- The All scope includes active and archived tickets, selection is highlighted, and the panes do not overlap.
+- Scrolling the detail timeline leaves list position unchanged; scrolling the list leaves detail position unchanged. Ticket actions remain visible while scrolling, and returning to a ticket restores its detail scroll position.
+- Touch dragging changes pane width. Accessibility adjustment clamps both panes to their minimum widths. The chosen width persists in DataStore and is restored after activity recreation together with selection.
+- An unsaved edit survives compact → expanded window transitions. Selecting another ticket while editing requires confirmation; cancelling that navigation keeps the edit. Saving commits the actual field value. Selection remains intact after folding and activity recreation.
 
-The delivered APK uses debug signing. Production distribution still requires release signing and physical-device acceptance testing. The environment draft has not been published, and restoration in a fresh cloud task has not been independently verified. Review/save the environment settings and publish to retain the prepared filesystem snapshot.
+The four new unit tests cover compact/expanded window classification, sizing bounds over several widths and invalid fractions, proportional width restoration, and combined All-scope search/sort behavior.
+
+The regression suite also rechecks ticket creation/editing, repeated hold/archive/reopen cycles, field conversion/retirement history, atomic field/audit rollback, schema migration, backup integrity/restore recovery, and Android reminder delivery/deduplication/cancellation. The compact create/order/reopen workflow is exercised through the UI.
+
+## Limits of validation
+
+A physical Galaxy Z Fold7 was not available. The adaptive UI is verified at representative logical window sizes, not against Samsung hardware or hinge sensors. Real Fold7 acceptance testing should include device-specific display zoom/font scales, hinge/flex postures, keyboard behavior, accessibility services, multi-window mode, and physical camera/video capture. Android 13+ notification permission and OEM battery restrictions remain part of physical-device QA. Reminders remain inexact WorkManager notifications as documented in the app.
+
+This is a debug-signed APK; production distribution requires release signing and device acceptance testing. The Room schema is unchanged by this UI update. The environment configuration was not republished or changed by this feature work.
+
+## Reproduce
+
+```sh
+source scripts/cloud-env.sh  # managed cloud only
+./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+# On a booted, sufficiently large emulator (see README.md):
+./gradlew :app:connectedDebugAndroidTest
+```
 
 ## APK integrity
 
-`PurchasingDesk-debug.apk` SHA-256:
+`PurchasingDesk-1.1.0-debug.apk` SHA-256:
 
-`661a37be5fd1e0a377bce87f96244e86ff1128d29fb502caacde5b7ab23675db`
+`0c98a98d91f2f52d64dfda59fbcbba10e6ccbbdd24bc735e8ea28d3e98e7745b`

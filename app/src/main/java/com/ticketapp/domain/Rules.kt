@@ -30,18 +30,19 @@ object Rules {
     }
     fun compatible(old: FieldType, new: FieldType): Boolean = old == new || (old in listOf(FieldType.TEXT,FieldType.LONG_TEXT) && new in listOf(FieldType.TEXT,FieldType.LONG_TEXT)) || (old==FieldType.INTEGER && new==FieldType.DECIMAL) || (old==FieldType.DATE && new==FieldType.DATETIME)
 }
+@kotlinx.serialization.Serializable
 data class Query(
     val archived: Boolean = false, val search: String = "", val statuses: Set<String> = emptySet(),
     val filters: Map<String,String> = emptyMap(), val createdFrom: Long? = null, val createdTo: Long? = null,
     val dueFrom: Long? = null, val dueTo: Long? = null, val overdue: Boolean = false,
-    val sort: String = "priority", val descending: Boolean = false
+    val sort: String = "priority", val descending: Boolean = false, val includeArchived: Boolean = false
 )
 fun selectTickets(s: Snapshot, q: Query, clock: Long = now()): List<Ticket> {
     val values = s.values.groupBy { it.ticketId }.mapValues { (_,v) -> v.associate { it.fieldId to it.value } }
     val fields=s.fields.associateBy { it.id }
     fun value(t:Ticket,id:String)=values[t.id]?.get(id).orEmpty()
     val found=s.tickets.filter { t ->
-        t.state.archived==q.archived && (q.statuses.isEmpty() || t.status in q.statuses) &&
+        (q.includeArchived || t.state.archived==q.archived) && (q.statuses.isEmpty() || t.status in q.statuses) &&
         (q.search.isBlank() || (listOf(t.id,t.number)+values[t.id].orEmpty().values+s.notes.filter{it.ticketId==t.id}.map{it.text}).any { it.contains(q.search,true) }) &&
         q.filters.all { (id,filter) -> filter.isBlank() || value(t,id).contains(filter,true) } &&
         (q.createdFrom==null || t.created>=q.createdFrom) && (q.createdTo==null || t.created<=q.createdTo) &&

@@ -2,11 +2,23 @@ package com.ticketapp
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import org.junit.Before
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 
 class CoreUiTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
+    private var originalWindow:TestWindow.Overrides?=null
+    @Before fun compactWindow() {
+        originalWindow=TestWindow.capture()
+        TestWindow.resize(400,880)
+        compose.waitUntil(90000){runCatching{compose.onAllNodesWithTag("phone-pane").fetchSemanticsNodes().isNotEmpty() && compose.activity.hasWindowFocus()}.getOrDefault(false)}
+        if(compose.onAllNodesWithContentDescription("Back").fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithContentDescription("Back").performClick()
+        }
+    }
+    @After fun restoreWindow() { originalWindow?.let(TestWindow::restore) }
     @Test fun createTicketThenArchiveAndReopen() {
         compose.waitForIdle()
         compose.onNodeWithText("New ticket",useUnmergedTree=true).performClick()

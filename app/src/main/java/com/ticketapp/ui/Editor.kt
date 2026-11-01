@@ -23,7 +23,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 @Composable
-fun TicketEditor(vm:DeskViewModel,s:Snapshot,ticketId:String,onCancel:()->Unit,onSaved:(String)->Unit) {
+fun TicketEditor(vm:DeskViewModel,s:Snapshot,ticketId:String,onCancel:()->Unit,onSaved:(String)->Unit,stickyActions:Boolean=false) {
     val existing=s.tickets.find{it.id==ticketId}
     val prefs by vm.preferences.collectAsState()
     val fields=s.fields.filter{it.enabled&&!it.retired}.sortedBy{it.position}
@@ -39,7 +39,21 @@ fun TicketEditor(vm:DeskViewModel,s:Snapshot,ticketId:String,onCancel:()->Unit,o
     val busy by vm.busy.collectAsState()
     fun update(d:Draft){draft=d;if(existing==null)vm.draft(d)}
     BackHandler {confirmExit=true}
-    LazyColumn(Modifier.fillMaxSize().testTag("ticket-form"),contentPadding=PaddingValues(16.dp,12.dp,16.dp,32.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+    val saveActions: @Composable () -> Unit = {
+Row(Modifier.fillMaxWidth().padding(12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            OutlinedButton({confirmExit=true},Modifier.weight(1f)){Text("Cancel")}
+            Button({
+                validation=fields.firstNotNullOfOrNull{f->Rules.validate(f,draft.values[f.id].orEmpty(),draft.attachments.count{it.fieldId==f.id}+s.attachments.count{it.ticketId==draft.id&&it.fieldId==f.id&&!it.removed})}
+                if(validation==null) vm.task {
+                    val id=vm.repository.save(draft.id,existing!=null,revision,draft.values,draft.due,draft.attachments,draft.reminders)
+                    if(existing==null)vm.clearDraft()
+                    withContext(Dispatchers.Main){onSaved(id)}
+                }
+            },Modifier.weight(1f),enabled=!busy){Text("Save ticket")}
+        }
+    }
+    Column(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("ticket-form"),contentPadding=PaddingValues(16.dp,12.dp,16.dp,32.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item { Text(if(existing==null)"Track the request. Keep the whole story." else existing.number,style=MaterialTheme.typography.bodyLarge) }
         if(existing==null && prefs["draft"].orEmpty().isNotBlank())item{Text("New-ticket draft is saved on this device.",style=MaterialTheme.typography.bodySmall)}
         items(fields,key={it.id}) { f -> FieldInput(f,draft.values[f.id].orEmpty(),{update(draft.copy(values=draft.values+(f.id to it)))},{mediaField=f},draft.attachments.count{it.fieldId==f.id}+s.attachments.count{it.ticketId==draft.id&&it.fieldId==f.id&&!it.removed}) }
@@ -54,17 +68,9 @@ fun TicketEditor(vm:DeskViewModel,s:Snapshot,ticketId:String,onCancel:()->Unit,o
             }){Text("Remind ${prefs["defaultReminderHours"]?:"24"} hours before due date")} }
         }
         validation?.let{item{Text(it,color=MaterialTheme.colorScheme.error)}}
-        item { Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-            OutlinedButton({confirmExit=true},Modifier.weight(1f)){Text("Cancel")}
-            Button({
-                validation=fields.firstNotNullOfOrNull{f->Rules.validate(f,draft.values[f.id].orEmpty(),draft.attachments.count{it.fieldId==f.id}+s.attachments.count{it.ticketId==draft.id&&it.fieldId==f.id&&!it.removed})}
-                if(validation==null) vm.task {
-                    val id=vm.repository.save(draft.id,existing!=null,revision,draft.values,draft.due,draft.attachments,draft.reminders)
-                    if(existing==null)vm.clearDraft()
-                    withContext(Dispatchers.Main){onSaved(id)}
-                }
-            },Modifier.weight(1f),enabled=!busy){Text("Save ticket")}
-        } }
+        if(!stickyActions)item { saveActions() }
+    }
+    if(stickyActions)Surface(tonalElevation=3.dp,shadowElevation=2.dp) { saveActions() }
     }
     if(confirmExit)Confirm("Leave this form?",if(existing==null)"Your draft will stay saved on this device." else "Unsaved edits will be discarded.",{confirmExit=false}){confirmExit=false;onCancel()}
     mediaField?.let { f -> AttachmentPicker(vm,draft.id,f,{mediaField=null}){a->update(draft.copy(attachments=draft.attachments+a));mediaField=null} }

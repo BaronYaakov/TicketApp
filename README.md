@@ -43,6 +43,27 @@ The setup script retains a verified Temurin JDK and official Android SDK under `
 
 WorkManager is intentionally inexact: Doze, battery saver, force-stop, and manufacturer restrictions can delay notifications. The app explains this in Settings and ticket detail. It does not request exact-alarm permission or silently promise precise delivery. Allow notifications and background operation in Android settings. A force-stopped app must be opened again for Android to resume its work.
 
+## Foldable and large-window workspace (v1.1)
+
+The layout responds to the **available app window width**, including safe-area insets. At 700 dp or wider, an unfolded-size window shows a ticket browser on the left and the selected ticket on the right. Narrower windows, such as the Fold7 cover display or a small split-screen window, retain phone navigation. There is no device-name or orientation assumption.
+
+- The left pane defaults to **All** tickets, including Ordered and Cancelled. Use All / Active / Archived, local search, filters, and sorting to refine it. The selected ticket is highlighted. Filtering it out keeps its details visible and shows a notice in the browser.
+- Both panes scroll independently. Search/scope controls stay above the list. Each ticket remembers its own detail scroll position when switching between tickets.
+- Drag the divider horizontally to resize the browser. Its 48 dp interaction area includes a visible grip. Tap the grip for a slider/reset dialog, use accessibility adjustment actions, or focus it and press the left/right arrow keys (Home resets). Width is retained in DataStore and included in manual backups. Minimum widths are 260 dp for the list and 360 dp for details.
+- New ticket and Settings stay in the top app bar. Edit / Change status / Add note stay above the scrolling detail body. In an expanded editor, Save and Cancel stay below the form and above the keyboard. Forms and detail content have a maximum readable width in larger windows.
+- Selection, filters, list position, pane ratio, and unsaved ticket edits survive Android activity recreation. Folding/unfolding retains the selected ticket. Selecting a different ticket, opening Settings, or starting another request while editing asks before leaving unsaved edits.
+
+The device UI tests resize an emulator between 400×880 dp and 768×896 dp. Android limits forced sizes to twice the emulator's physical dimensions, so the original tiny 320-pixel AVD cannot run the expanded tests. Start a large enough emulator, for example:
+
+```sh
+source scripts/cloud-env.sh
+"$ANDROID_HOME/emulator/emulator" -avd TicketAppTests -skin 800x1200 -no-window -no-audio -no-boot-anim -no-snapshot -accel off -gpu swiftshader_indirect -cores 4 -memory 2048
+# In a separate shell, after sys.boot_completed is 1:
+./gradlew :app:connectedDebugAndroidTest
+```
+
+Run display-resizing tests on an emulator. They capture and restore prior size/density overrides. They do not replace acceptance testing on a physical Fold7, especially hinge postures, OEM keyboard behavior, font scaling, and multi-window transitions.
+
 ## Backups, restore, and CSV
 
 Settings → Data management uses Android's document picker to export/restore a versioned ZIP. `data.json` contains structured records, full append-only histories, field definitions, preferences, notes, reminder configurations, and attachment metadata. `media/` includes every referenced attachment, including removed media. `manifest.json` contains format version and SHA-256 checksums. Unsaved new-ticket drafts are local working state and are not included in backups. Backups are not encrypted: choose a secure destination if data is sensitive. Checksums detect corruption, not deliberate forgery by a person who can rewrite the manifest.

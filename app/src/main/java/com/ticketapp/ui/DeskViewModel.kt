@@ -24,6 +24,25 @@ class DeskViewModel(application:Application):AndroidViewModel(application) {
     val message=MutableStateFlow<String?>(null)
     val selected=MutableStateFlow<String?>(null)
     var draftJob:Job?=null
+    private var panePreferenceJob:Job?=null
+    private var sortPreferenceJob:Job?=null
+    fun workspaceSort(field:String,descending:Boolean) {
+        sortPreferenceJob?.cancel()
+        sortPreferenceJob=app.scope.launch {
+            try { app.preferences.setAll(mapOf("sort" to field,"descending" to descending.toString())) }
+            catch(e:CancellationException) { throw e }
+            catch(e:Exception) { message.value="Could not save sort preference: ${e.message}" }
+        }
+    }
+    fun paneFraction(value:Float) {
+        // Called at drag end, not on each pixel; saving never blocks ticket actions.
+        panePreferenceJob?.cancel()
+        panePreferenceJob=app.scope.launch {
+            try { app.preferences.set("listPaneFraction",value.toString()) }
+            catch(e:CancellationException) { throw e }
+            catch(e:Exception) { message.value="Could not save pane width: ${e.message}" }
+        }
+    }
     fun task(success:String?=null,block:suspend ()->Unit) {
         if(busy.value) return
         busy.value=true

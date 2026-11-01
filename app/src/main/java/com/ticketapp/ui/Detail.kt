@@ -12,11 +12,13 @@ import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -26,7 +28,7 @@ import com.ticketapp.data.*
 import java.time.Instant
 
 @Composable
-fun TicketDetail(vm:DeskViewModel,s:Snapshot,t:Ticket,onEdit:()->Unit) {
+fun TicketDetail(vm:DeskViewModel,s:Snapshot,t:Ticket,onEdit:()->Unit,paneMode:Boolean=false) {
     var change by remember{mutableStateOf(false)}
     var note by remember{mutableStateOf<Note?>(null)}
     var addingNote by remember{mutableStateOf(false)}
@@ -38,15 +40,26 @@ fun TicketDetail(vm:DeskViewModel,s:Snapshot,t:Ticket,onEdit:()->Unit) {
     val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){granted->vm.message.value=if(granted)"Notifications enabled" else "Reminders are saved; allow notifications in Android settings to receive them."}
     val v=s.values.filter{it.ticketId==t.id}.associate{it.fieldId to it.value}
     val attachments=s.attachments.filter{it.ticketId==t.id && (!it.removed||historyMedia)}
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp,12.dp,16.dp,32.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item { Text(t.number,style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary);Text(v["title"]?.ifBlank{null}?:"Untitled request",style=MaterialTheme.typography.headlineMedium);Text(t.state.label,style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary) }
-        item { Text("Created ${stamp(t.created)}\nUpdated ${stamp(t.updated)}"+(t.closed?.let{"\nClosed ${stamp(it)}"}?:""),style=MaterialTheme.typography.bodySmall) }
-        if(t.state==Status.HOLD)item { Card { Text("ON HOLD\n"+(s.audit.firstOrNull{it.ticketId==t.id&&it.type=="ON_HOLD"}?.reason?:""),Modifier.padding(16.dp)) } }
-        item { FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+    val detailScroll=rememberLazyListState()
+    val actions: @Composable () -> Unit = {
+FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){
             if(!t.state.archived)OutlinedButton(onEdit){Text("Edit ticket")}
             Button({change=true}){Text(if(t.state.archived)"Reopen" else "Change status")}
             if(!t.state.archived)OutlinedButton({addingNote=true}){Text("Add note")}
-        } }
+        }
+    }
+    Column(Modifier.fillMaxSize()) {
+        if(paneMode)Surface(tonalElevation=2.dp,shadowElevation=1.dp) {
+            Column(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp)) {
+                Text("${t.number} · ${t.state.label}",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary)
+                actions()
+            }
+        }
+    LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("ticket-detail-list"),state=detailScroll,contentPadding=PaddingValues(16.dp,12.dp,16.dp,32.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        item { Text(t.number,style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary);Text(v["title"]?.ifBlank{null}?:"Untitled request",style=MaterialTheme.typography.headlineMedium);Text(t.state.label,style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary) }
+        item { Text("Created ${stamp(t.created)}\nUpdated ${stamp(t.updated)}"+(t.closed?.let{"\nClosed ${stamp(it)}"}?:""),style=MaterialTheme.typography.bodySmall) }
+        if(t.state==Status.HOLD)item { Card { Text("ON HOLD\n"+(s.audit.firstOrNull{it.ticketId==t.id&&it.type=="ON_HOLD"}?.reason?:""),Modifier.padding(16.dp)) } }
+        if(!paneMode)item { actions() }
         if(t.state.archived)item { Text("Archived requests are read-only. Reopen to make operational updates.",style=MaterialTheme.typography.bodyMedium) }
         items(s.fields.filter{!it.kind.media && (v[it.id].orEmpty().isNotBlank()||(!it.retired&&it.enabled))}.sortedBy{it.position},key={it.id}){f->
             Column { Text(f.name+if(f.retired)" (retired)" else "",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -82,6 +95,7 @@ fun TicketDetail(vm:DeskViewModel,s:Snapshot,t:Ticket,onEdit:()->Unit) {
         }
         item { HorizontalDivider();Text("Activity timeline",style=MaterialTheme.typography.titleLarge);Text("Newest first · permanent history",style=MaterialTheme.typography.bodySmall) }
         items(s.audit.filter{it.ticketId==t.id},key={it.id}){event->AuditRow(event)}
+    }
     }
     if(change)TransitionDialog(vm,t){change=false}
     if(addingNote || note!=null)TextDialog(if(note==null)"Add note" else "Edit note",note?.text.orEmpty(),{addingNote=false;note=null}){text->val id=note?.id;vm.task{vm.repository.saveNote(t.id,text,id)};addingNote=false;note=null}

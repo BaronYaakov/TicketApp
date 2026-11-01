@@ -14,8 +14,12 @@ class MainActivity:ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         vm=ViewModelProvider(this)[DeskViewModel::class.java]
-        vm.selected.value=intent.getStringExtra("ticket")
+        vm.selected.value=if(savedInstanceState!=null) savedInstanceState.getString("selectedTicket") else intent.getStringExtra("ticket")
         setContent { DeskApp(vm) }
+    }
+    override fun onSaveInstanceState(outState:Bundle) {
+        outState.putString("selectedTicket",vm.selected.value)
+        super.onSaveInstanceState(outState)
     }
     override fun onNewIntent(intent:Intent) { super.onNewIntent(intent);setIntent(intent);vm.selected.value=intent.getStringExtra("ticket") }
 }
