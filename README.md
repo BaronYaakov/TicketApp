@@ -2,6 +2,14 @@
 
 A native, single-user Android purchasing and maintenance request tracker. Kotlin, Jetpack Compose Material 3, MVVM, Room/SQLite, DataStore, and WorkManager. Runs on Android 9 (API 28) and newer. The application has **no Internet permission**, account, server, analytics, or cloud database. Manual backups go only to the document provider you choose.
 
+## Download version 1.1.0
+
+- [Android APK](https://github.com/BaronYaakov/TicketApp/raw/refs/heads/downloads/PurchasingDesk-1.1.0-debug.apk)
+- [Complete Android Studio project ZIP](https://github.com/BaronYaakov/TicketApp/raw/refs/heads/downloads/TicketApp-1.1.0-source.zip)
+- [SHA-256 checksums](https://github.com/BaronYaakov/TicketApp/blob/downloads/SHA256SUMS)
+
+The APK supports Android 9 and newer and uses the same debug signing certificate as the earlier build, so it can be installed as an update. These download links are hosted on the repository's `downloads` branch and do not depend on a cloud workspace artifact link.
+
 ## Build and install
 
 Open this directory in Android Studio with a JDK 17 or 21, Android SDK platform 35, and build-tools 35.0.0. Let Android Studio create `local.properties`, or set `ANDROID_HOME` to your SDK directory.
